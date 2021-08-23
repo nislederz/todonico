@@ -69,12 +69,12 @@ namespace todonico.Functions.Functions
             ILogger log)
         {
             log.LogInformation($"Update for todo: {id}, received.");
-            
+
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             Todo todo = JsonConvert.DeserializeObject<Todo>(requestBody);
 
             //Validate todo id
-            TableOperation findOperation = TableOperation.Retrieve<TodoEntity>("TODO",id);
+            TableOperation findOperation = TableOperation.Retrieve<TodoEntity>("TODO", id);
             TableResult findResult = await todoTable.ExecuteAsync(findOperation);
             if (findResult.Result == null)
             {
@@ -91,7 +91,7 @@ namespace todonico.Functions.Functions
             if (!string.IsNullOrEmpty(todo.TaskDescription))
             {
                 todoEntity.TaskDescription = todo.TaskDescription;
-            }            
+            }
 
             TableOperation addOperation = TableOperation.Replace(todoEntity);
             await todoTable.ExecuteAsync(addOperation);
@@ -148,6 +148,38 @@ namespace todonico.Functions.Functions
             }
 
             string message = $"Todo: {todoEntity.RowKey}, received.";
+            log.LogInformation(message);
+
+            return new OkObjectResult(new Response
+            {
+                IsSuccess = true,
+                Message = message,
+                Result = todoEntity
+            });
+        }
+
+        [FunctionName(nameof(DeleteTodo))]
+        public static async Task<IActionResult> DeleteTodo(
+           [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "todo/{id}")] HttpRequest req,
+           [Table("todo", "TODO", "{id}", Connection = "AzureWebJobsStorage")] TodoEntity todoEntity,
+           [Table("todo", Connection = "AzureWebJobsStorage")] CloudTable todoTable,
+           string id,
+           ILogger log)
+        {
+            log.LogInformation($"Delete todo: {id}, received.");
+
+            if (todoEntity == null)
+            {
+                return new BadRequestObjectResult(new Response
+                {
+                    IsSuccess = false,
+                    Message = "Todo not found."
+                });
+            }
+
+            await todoTable.ExecuteAsync(TableOperation.Delete(todoEntity));
+
+            string message = $"Todo: {todoEntity.RowKey}, deleted.";
             log.LogInformation(message);
 
             return new OkObjectResult(new Response
